@@ -654,6 +654,10 @@ export default function DigitalTwinPage() {
   const [pulsing, setPulsing] = useState(false);
   const [fieldSavedTick, setFieldSavedTick] = useState(0);
   const [twinCoords, setTwinCoords] = useState<{ lat: number; lon: number } | null>(null);
+  
+  // AI Predictor State
+  const [predictedCrop, setPredictedCrop] = useState<string | null>(null);
+  const [predicting, setPredicting] = useState(false);
 
   const field = useMemo(() => loadTwinField(), [fieldSavedTick]);
 
@@ -682,6 +686,28 @@ export default function DigitalTwinPage() {
     setPulsing(true);
     load(true);
     setTimeout(() => setPulsing(false), 1200);
+  };
+
+  const handlePredict = async (ph: number, moisture: number, temperature: number, rainfall: number) => {
+    setPredicting(true);
+    setPredictedCrop(null);
+    try {
+      const res = await fetch("http://localhost:5000/api/digital-twin/predict-crop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ph, moisture, temperature, rainfall }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPredictedCrop(data.prediction);
+      } else {
+        alert("Prediction failed: " + data.message);
+      }
+    } catch (err) {
+      alert("Error contacting prediction service");
+    } finally {
+      setPredicting(false);
+    }
   };
 
   if (loading && !twin) {
@@ -806,6 +832,46 @@ export default function DigitalTwinPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* ===== NEW: AI CROP PREDICTOR ===== */}
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 sm:p-8 shadow-md text-white space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-xl bg-white/20"><Sparkles className="w-5 h-5" /></span>
+            <div>
+              <h2 className="text-lg font-bold leading-tight">AI Machine Learning Crop Predictor</h2>
+              <p className="text-xs text-emerald-100">
+                Uses our Random Forest model to analyze live farm data and recommend the best crop.
+              </p>
+            </div>
+          </div>
+          
+          <div className="bg-white/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-white/20">
+            <div className="grid grid-cols-2 gap-4 text-sm font-semibold">
+              <div><span className="text-emerald-200">Soil pH:</span> {t.ph}</div>
+              <div><span className="text-emerald-200">Moisture:</span> {rootZone}%</div>
+              <div><span className="text-emerald-200">Temperature:</span> {t.airTemp}°C</div>
+              <div><span className="text-emerald-200">Rainfall:</span> {t.rainToday} mm</div>
+            </div>
+            
+            <div className="flex flex-col sm:items-end gap-2">
+              <button
+                onClick={() => handlePredict(t.ph, rootZone, t.airTemp, t.rainToday)}
+                disabled={predicting}
+                className="px-6 py-2.5 rounded-xl bg-white text-emerald-700 hover:bg-emerald-50 active:scale-95 text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
+              >
+                {predicting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FlaskConical className="w-4 h-4" />}
+                <span>{predicting ? "Analyzing..." : "Predict Best Crop"}</span>
+              </button>
+              
+              {predictedCrop && (
+                <div className="mt-2 text-center sm:text-right">
+                  <span className="text-xs text-emerald-100 uppercase tracking-wider font-bold">AI Recommendation:</span>
+                  <p className="text-2xl font-extrabold text-amber-300 drop-shadow-sm">{predictedCrop} 🌾</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
