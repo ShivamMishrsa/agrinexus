@@ -8,16 +8,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone, password } = req.body;
     let user = await prisma.user.findFirst({
-      where: { phone: phone || "+91 9812345678" },
+      where: { phone: phone },
       include: { farmerProfile: true, dealerProfile: true },
     });
-
-    if (!user) {
-      user = await prisma.user.findFirst({
-        where: { role: "FARMER" },
-        include: { farmerProfile: true, dealerProfile: true },
-      });
-    }
 
     if (!user) {
       res.status(404).json({ success: false, message: "User not found." });

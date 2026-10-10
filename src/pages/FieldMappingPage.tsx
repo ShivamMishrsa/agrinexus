@@ -42,7 +42,7 @@ export default function FieldMappingPage() {
 
   const fetchFields = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("km_auth_token");
       if (!token) return;
       const res = await fetch("/api/fields", { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
@@ -150,7 +150,7 @@ export default function FieldMappingPage() {
   const deleteFieldData = async (id: string) => {
      if (!window.confirm("Are you sure you want to delete this field permanently?")) return;
      try {
-       await fetch(`/api/fields/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+       await fetch(`/api/fields/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("km_auth_token")}` } });
        fetchFields();
      } catch (e) { alert("Failed to delete."); }
   };
@@ -173,7 +173,7 @@ export default function FieldMappingPage() {
        // Phase 4: Fetch real Sentinel-2 satellite data
        setIsFetchingSatellite(true);
        setSatelliteData(null);
-       const token = localStorage.getItem("token");
+       const token = localStorage.getItem("km_auth_token");
        const res = await fetch(`/api/gis/satellite-data/${field.id}`, {
           headers: { Authorization: `Bearer ${token}` }
        });
@@ -207,23 +207,30 @@ export default function FieldMappingPage() {
     };
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("km_auth_token");
       const res = await fetch("/api/fields", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error("API failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "API failed");
+      }
       
       setSavedSuccess(true);
       setHasUnsavedChanges(false);
       fetchFields();
       setTimeout(() => setSavedSuccess(false), 3500);
-    } catch (e) {
-      const queue = JSON.parse(localStorage.getItem("offline_fields_queue") || "[]");
-      queue.push(payload);
-      localStorage.setItem("offline_fields_queue", JSON.stringify(queue));
-      alert("No internet connection! Field saved locally. It will sync when you are back online.");
+    } catch (e: any) {
+      if (e.message !== "API failed" && e.message !== "Failed to fetch") {
+         alert("Server rejected the save: " + e.message);
+      } else {
+         const queue = JSON.parse(localStorage.getItem("offline_fields_queue") || "[]");
+         queue.push(payload);
+         localStorage.setItem("offline_fields_queue", JSON.stringify(queue));
+         alert("No internet connection! Field saved locally. It will sync when you are back online.");
+      }
       setHasUnsavedChanges(false);
     } finally {
       setIsSyncing(false);

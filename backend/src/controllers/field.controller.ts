@@ -20,12 +20,22 @@ export const getFields = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+import fs from "fs";
+
 // Create a new field
 export const createField = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log("Saving field... (backend restarted successfully)");
     const userId = req.user?.id;
     if (!userId) {
       res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    // Protect against ghost sessions (user deleted but token still exists)
+    const userExists = await prisma.user.findUnique({ where: { id: userId } });
+    if (!userExists) {
+      res.status(401).json({ success: false, message: "Your account session is invalid or the database was reset. Please log out and log back in." });
       return;
     }
 
@@ -57,6 +67,7 @@ export const createField = async (req: Request, res: Response): Promise<void> =>
 
     res.status(201).json({ success: true, field });
   } catch (error: any) {
+    fs.writeFileSync("field_error.log", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     console.error("Create field error:", error);
     res.status(500).json({ success: false, message: "Failed to create field" });
   }

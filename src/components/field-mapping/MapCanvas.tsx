@@ -36,18 +36,26 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const startLng = longitude || 79.0882;
     const map = L.map(mapContainerRef.current, { gestureHandling: true } as L.MapOptions).setView([startLat, startLng], 16);
 
-    // Phase 5: Move off OSM public servers to Mapbox (with fallback if no token)
-    const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "pk.eyJ1IjoiZGVtbyIsImEiOiJjbGludF9kZW1vX3Rva2VuXzEyMyJ9.demo";
+    // Phase 5: Mapbox is preferred, but we gracefully fallback to free OSM/Esri if no token is provided
+    const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
     
     // We use L.tileLayer.offline for Phase 5: Offline Caching
-    const streetLayer = (L.tileLayer as any).offline(`https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, { 
+    const streetUrl = MAPBOX_TOKEN 
+        ? `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`
+        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+        
+    const satelliteUrl = MAPBOX_TOKEN
+        ? `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`
+        : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+    const streetLayer = (L.tileLayer as any).offline(streetUrl, { 
         maxZoom: 19,
-        attribution: '© Mapbox'
+        attribution: MAPBOX_TOKEN ? '© Mapbox' : '© OpenStreetMap'
     });
 
-    const satelliteLayer = (L.tileLayer as any).offline(`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, { 
+    const satelliteLayer = (L.tileLayer as any).offline(satelliteUrl, { 
         maxZoom: 19,
-        attribution: '© Mapbox'
+        attribution: MAPBOX_TOKEN ? '© Mapbox' : 'Tiles © Esri'
     });
 
     // Phase 5: Add loading and tile-failure states
