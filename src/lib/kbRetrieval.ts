@@ -14,6 +14,7 @@
 // =====================================================
 import { supabase } from "./supabaseClient";
 import { GEMINI_API_KEY } from "./geminiKey";
+import { fetchWithTimeout } from "./net";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIMS = 768;
@@ -28,16 +29,21 @@ export interface KbMatch {
 
 /** Embed a short query text into a 768-dim vector */
 export async function embedQuery(text: string): Promise<number[]> {
-  const response = await fetch(EMBED_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: `models/${EMBED_MODEL}`,
-      content: { parts: [{ text }] },
-      taskType: "RETRIEVAL_QUERY",
-      outputDimensionality: EMBED_DIMS,
-    }),
-  });
+  // Bounded: a stalled embedding call must not delay the chat answer.
+  const response = await fetchWithTimeout(
+    EMBED_URL,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: `models/${EMBED_MODEL}`,
+        content: { parts: [{ text }] },
+        taskType: "RETRIEVAL_QUERY",
+        outputDimensionality: EMBED_DIMS,
+      }),
+    },
+    10000
+  );
   if (!response.ok) throw new Error(`Embedding error: ${response.status}`);
   const data = await response.json();
   return data.embedding?.values || [];
